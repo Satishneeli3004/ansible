@@ -1,0 +1,40 @@
+---
+- name: Update dataset-api docker image tag in new-docker-compose.yaml and list docker containers
+  hosts: app_servers
+  gather_facts: no
+  become: true
+
+
+  vars:
+    new_image_tag: "" # should be passed from Jenkins pipeline
+
+  tasks:
+    - name: Backup existing docker-compose file with date_hour_minute timestamp
+      copy:
+        src: /home/ubuntu/API-Deployment/new-docker-compose.yaml
+        dest: "/home/ubuntu/API-Deployment/new-docker-compose-bkp-{{ lookup('pipe', 'date +%Y-%m-%d_%H-%M') }}.yaml"
+        remote_src: yes
+        backup: no
+
+    - name: Update dataset-api image tag in docker-compose file
+      ansible.builtin.shell: |
+        sed -i -r 's|(image:\s*artifacts\.ezee\.ai/dataset-api/dataset-api:)[^ ]+|\1{{ new_image_tag }}|' /home/ubuntu/API-Deployment/new-docker-compose.yaml
+      args:
+        executable: /bin/bash
+
+    - name: Show updated docker-compose dataset-api snippet
+      ansible.builtin.shell: |
+        grep -A 6 'Dataset-api:' /home/ubuntu/API-Deployment/new-docker-compose.yaml
+      register: compose_snippet
+
+    - name: Display updated docker-compose dataset-api section
+      ansible.builtin.debug:
+        var: compose_snippet.stdout_lines
+
+    - name: List all Docker containers on app server
+      ansible.builtin.command: docker ps -a
+      register: docker_output
+
+    - name: Show Docker containers output
+      ansible.builtin.debug:
+        var: docker_output.stdout_lines
