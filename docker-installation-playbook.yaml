@@ -1,0 +1,8 @@
+---
+
+- name: docker-installtion
+  hosts: node2
+  become: true
+  remote_user: ubuntu
+  roles:
+    - IngmarRaw.docker
