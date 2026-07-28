@@ -1,0 +1,9 @@
+---
+- name: webserver
+  # hosts: all
+  hosts: localhost
+  remote_user: ubuntu
+  become: true
+  roles:
+    - apache2
+  
