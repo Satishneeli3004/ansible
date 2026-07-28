@@ -1,0 +1,51 @@
+---
+- name: Update docker image tag in docker-compose.yaml and redeploy
+  hosts: collection_servers
+  gather_facts: no
+  become: true
+
+  vars:
+    container_list: "{{ container_list | default([]) }}"
+    new_image_tag: ""
+    repositoryname: ""
+    compose_file_path: "/home/ubuntu/API-Deployment/docker-compose.yaml"
+
+  tasks:
+    - name: Backup existing docker-compose.yaml
+      copy:
+        src: "{{ compose_file_path }}"
+        dest: "{{ compose_file_path }}.bak_{{ ansible_date_time.date }}_{{ ansible_date_time.time }}"
+        remote_src: yes
+
+    - name: Update image tag in docker-compose.yaml
+      replace:
+        path: "{{ compose_file_path }}"
+        regexp: "{{ repositoryname }}:.*"
+        replace: "{{ repositoryname }}:{{ new_image_tag }}"
+      register: compose_update
+
+    - name: Redeploy updated containers (pull & recreate if image changed)
+      command: docker compose -f "{{ compose_file_path }}" up -d
+      args:
+        chdir: "{{ compose_file_path | dirname }}"
+      when: compose_update.changed
+
+    - name: Show container status
+      command: docker ps --filter "name={{ item }}"
+      loop: "{{ container_list }}"
+      register: status_output
+      changed_when: false
+
+    - name: Display container status
+      debug:
+        msg: "{{ status_output.results | map(attribute='stdout') | list }}"
+
+    - name: Show last 50 lines of container logs
+      command: docker logs --tail 50 {{ item }}
+      loop: "{{ container_list }}"
+      register: logs_output
+      changed_when: false
+
+    - name: Display container logs
+      debug:
+        msg: "{{ logs_output.results | map(attribute='stdout') | list }}"
